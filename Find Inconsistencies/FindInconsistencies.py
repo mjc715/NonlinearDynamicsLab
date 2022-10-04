@@ -20,22 +20,27 @@ csData['Date'] = pd.to_datetime(csData['Date'], format='%m/%d/%Y')
 csData.sort_values(by='Date', inplace=True)
 satelliteData.sort_values(by='Date', inplace=True)
 
-print(csData)
-print(satelliteData)
+# Get specific parameters for search
+print('Enter radius to search for inconsistent points (m) :')
+searchDistance = int(input())
+print('Enter range of time to search in (days) :')
+timeRange = int(input())
+print('Enter minimum density difference to look for :')
+densityRange = float(input())
 
-# Compares all locations' Sargassum density based on distance = 200m, Timerange = 2 days, densityDiff = .0005
+# Compares all locations' Sargassum density based on searchDistance, timeRange, and densityRange
 for x in satelliteData.index:
     date = satelliteData.loc[x, 'Date']
     for y in csData.index:
         csDate = csData.loc[y, 'Date']
         dateDiff = date - csDate
-        if (abs(dateDiff) <= timedelta(days=2)):
+        if (abs(dateDiff) <= timedelta(days=timeRange)):
             densityDiff = abs(
                 satelliteData.loc[x, 'DENSITY'] - csData.loc[y, 'DENSITY'])
             distance = GD((satelliteData.loc[x, 'Latitude'], satelliteData.loc[x, 'Longitude']), (
                 csData.loc[y, 'Lat'], csData.loc[y, 'Lon'])).m
 
-            if (densityDiff > 0.0005 and distance <= 200):
+            if (densityDiff > densityRange and distance <= searchDistance):
                 print(satelliteData.loc[x, 'Site'])
                 print(satelliteData.loc[x, 'Date'])
                 print("Date difference: ", dateDiff)
