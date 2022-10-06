@@ -33,6 +33,7 @@ def look_for_differences(satelliteData, csData):
                     csData.loc[y, 'Lat'], csData.loc[y, 'Lon'])).m
 
                 if (densityDiff >= densityRange and distance <= searchDistance):
+
                     print(satelliteData.loc[x, 'Site'])
                     print(satelliteData.loc[x, 'Date'])
                     print("Date difference: ", dateDiff)
