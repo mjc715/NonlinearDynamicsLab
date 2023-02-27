@@ -1,9 +1,9 @@
 import cv2
 import matplotlib.pyplot as plt
 
-measuring_length = .4  # meters
+measuring_length = .31  # meters
 camera_fps = 30  # frames per second
-video_path = "ANMR0002.mp4"
+video_path = "ANMR0000 (1).mp4"
 
 
 def get_frames(video_path):
@@ -39,6 +39,7 @@ def get_ball_frame(video_path):  # Finds start and end frames
     while video.isOpened():
         rete, frame = video.read()
         if counter == 0:
+            frame = cv2.resize(frame, (854, 480))
             rect = cv2.selectROI(frame)
             cv2.destroyAllWindows()
         # Cropping img to check for presence of ball in set area
