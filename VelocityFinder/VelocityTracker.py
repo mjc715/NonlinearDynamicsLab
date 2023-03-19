@@ -4,10 +4,11 @@ import sys
 import numpy as np
 
 measuring_length = .18  # meters
-camera_fps = 30.7  # frames per second
+camera_fps = 30  # frames per second
 video_path = "ANMR0004.mp4"
 numPoints = 3  # number of times velocity will be calculated
 tracker_type = 'MIL'
+releaseFrame = 62  # this is the frame where the obj is released and the timer starts
 video = cv2.VideoCapture(video_path)
 FLUID_VISCOSITY = 8.927 * 10**-7  # kinematic viscosity m^2/s
 FLUID_DENSITY = 997  # kg/m^3
@@ -18,7 +19,9 @@ if not video.isOpened():
     print("Video not opened")
     sys.exit()
 
-rete, frame = video.read()
+i = 1
+while (i <= releaseFrame):
+    rete, frame = video.read()
 frame = cv2.resize(frame, (854, 480))
 
 if not rete:
@@ -35,31 +38,35 @@ trackingPoints, interval = np.linspace(measuringBounds[1],
 
 
 params = cv2.SimpleBlobDetector_Params()
-params.filterByCircularity = True
-params.minCircularity = 0.9
+params.filterByCircularity = False
+params.minCircularity = 0.5
 
 if int(7) < 3:
     tracker = cv2.Tracker_create(tracker_type)
 else:
     tracker = cv2.TrackerMIL_create()
 
+# --- Creating foreground mask
 frame = cv2.resize(frame, (854, 480))
-
 if not rete:
     print('Cant read video file')
     sys.exit()
+BS_MOG2 = cv2.createBackgroundSubtractorMOG2()
+mog2_frame = BS_MOG2.apply(frame)
+cv2.imshow('MOG2 tracker', mog2_frame)
 
-objectBounds = cv2.selectROI("Select ball", frame)
+objectBounds = cv2.selectROI("Select object", mog2_frame)
 cv2.destroyAllWindows()
-rete = tracker.init(frame, objectBounds)
+rete = tracker.init(mog2_frame, objectBounds)
 p1, prev = None, None
 
-frameCount, prevFrame, speed = 1, 0, 0
+frameCount, prevFrame, speed = releaseFrame, 0, 0
 trackingCount = numPoints - 2  # Points start at where the ball is so skip one point
 velocities, times = [], []
 
 while video.isOpened():
     rete, frame = video.read()
+    frame = BS_MOG2.apply(frame)
     frameCount += 1
 
     if not rete:
@@ -85,7 +92,7 @@ while video.isOpened():
         time = (frameCount - prevFrame) / camera_fps
         length = interval / PIXELS_PER_METER
         speed = length / time
-        velocities.append(frameCount / camera_fps)
+        velocities.append(speed)
         times.append(time)
         prevFrame = frameCount
         trackingCount -= 1
