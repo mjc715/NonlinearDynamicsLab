@@ -3,12 +3,12 @@ import matplotlib.pyplot as plt
 import sys
 import numpy as np
 
-measuring_length = .18  # meters
+measuring_length = .30  # meters
 camera_fps = 30  # frames per second
-video_path = "ANMR0004.mp4"
-numPoints = 3  # number of times velocity will be calculated
+video_path = "ANMR0010.mp4"
+numPoints = 10  # number of times velocity will be calculated
 tracker_type = 'MIL'
-releaseFrame = 62  # this is the frame where the obj is released and the timer starts
+releaseFrame = 10  # this is the frame where the obj is released and the timer starts
 video = cv2.VideoCapture(video_path)
 FLUID_VISCOSITY = 8.927 * 10**-7  # kinematic viscosity m^2/s
 FLUID_DENSITY = 997  # kg/m^3
@@ -22,12 +22,13 @@ if not video.isOpened():
 i = 1
 while (i <= releaseFrame):
     rete, frame = video.read()
-frame = cv2.resize(frame, (854, 480))
+    i += 1
 
 if not rete:
     print('Cant read video file')
     sys.exit()
 
+frame = cv2.resize(frame, (854, 480))
 measuringBounds = cv2.selectROI(
     "Select tracking area", frame)  # Start area at top of ball
 cv2.destroyAllWindows()
@@ -39,7 +40,9 @@ trackingPoints, interval = np.linspace(measuringBounds[1],
 
 params = cv2.SimpleBlobDetector_Params()
 params.filterByCircularity = False
-params.minCircularity = 0.5
+params.filterByColor = True
+params.blobColor = 150
+params.minCircularity = 0.9
 
 if int(7) < 3:
     tracker = cv2.Tracker_create(tracker_type)
@@ -51,13 +54,12 @@ frame = cv2.resize(frame, (854, 480))
 if not rete:
     print('Cant read video file')
     sys.exit()
-BS_MOG2 = cv2.createBackgroundSubtractorMOG2()
-mog2_frame = BS_MOG2.apply(frame)
-cv2.imshow('MOG2 tracker', mog2_frame)
+# BS_KNN = cv2.createBackgroundSubtractorKNN()
+# frame = BS_KNN.apply(frame)
 
-objectBounds = cv2.selectROI("Select object", mog2_frame)
+objectBounds = cv2.selectROI("Select object", frame)
 cv2.destroyAllWindows()
-rete = tracker.init(mog2_frame, objectBounds)
+rete = tracker.init(frame, objectBounds)
 p1, prev = None, None
 
 frameCount, prevFrame, speed = releaseFrame, 0, 0
@@ -66,7 +68,7 @@ velocities, times = [], []
 
 while video.isOpened():
     rete, frame = video.read()
-    frame = BS_MOG2.apply(frame)
+    # frame = BS_KNN.apply(frame)
     frameCount += 1
 
     if not rete:
@@ -89,11 +91,12 @@ while video.isOpened():
                     cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
 
     if objectBounds[1] <= trackingPoints[trackingCount] and trackingCount >= 0:
-        time = (frameCount - prevFrame) / camera_fps
+        timeInterval = (frameCount - prevFrame) / camera_fps
         length = interval / PIXELS_PER_METER
-        speed = length / time
+        speed = length / timeInterval
         velocities.append(speed)
-        times.append(time)
+        totalTime = (frameCount - releaseFrame) / camera_fps
+        times.append(totalTime)
         prevFrame = frameCount
         trackingCount -= 1
 
