@@ -3,15 +3,6 @@ import matplotlib.pyplot as plt
 import sys
 import numpy as np
 
-# --- PARAMETERS --- #
-measuring_length = 2.35  # meters
-camera_fps = 30  # frames per second
-releaseFrame = 160  # this is the frame where the obj is released and the timer starts
-numPoints = 16  # number of times velocity will be calculated
-video_path = "Wave Tank Vids\ANMR0013.mp4"
-tracker_type = 'CSRT'
-video = cv2.VideoCapture(video_path)
-
 
 def getAveragePixelPerMeterHorizontal(frame):
     frame = cv2.resize(frame, (854, 480))
@@ -360,6 +351,14 @@ def horizontalTracking(measuring_length, releaseFrame, numPoints, video_path, tr
 
 
 # ---- MAIN CODE ---- #
+measuring_length = 2.35  # meters
+camera_fps = 30  # frames per second
+releaseFrame = 160  # this is the frame where the obj is released and the timer starts
+numPoints = 16  # number of times velocity will be calculated
+video_path = "Wave Tank Vids\ANMR0013.mp4"
+tracker_type = 'CSRT'
+video = cv2.VideoCapture(video_path)
+
 horizontalTracking(measuring_length, releaseFrame,
                    numPoints, video_path, tracker_type, video)
 # verticalTracking(measuring_length, releaseFrame,
