@@ -2,7 +2,15 @@ import cv2
 import matplotlib.pyplot as plt
 import sys
 import numpy as np
-import json
+
+# --- PARAMETERS --- #
+measuring_length = 2.35  # meters
+camera_fps = 30  # frames per second
+releaseFrame = 160  # this is the frame where the obj is released and the timer starts
+numPoints = 16  # number of times velocity will be calculated
+video_path = "Wave Tank Vids\ANMR0013.mp4"
+tracker_type = 'CSRT'
+video = cv2.VideoCapture(video_path)
 
 
 def getAveragePixelPerMeterHorizontal(frame):
@@ -21,7 +29,7 @@ def getAveragePixelPerMeterHorizontal(frame):
         input("What is the length of the selection in meters?\n"))
     pixelPerMeter2 = measuringBounds[2] / refLength2
     avgPPM = .5 * (pixelPerMeter1 + pixelPerMeter2)
-    print(avgPPM)
+    print('Average pixels/m: {}\n'.format(avgPPM))
     return avgPPM
 
 
@@ -61,34 +69,26 @@ def calculateDelta():
     print(str.format(deltas[0]))
 
 
-def writeToFile(outfile, delta, times, velocities, vAvg, slope):
+def writeToFile(outfile, delta, times, velocities, vAvg, slope, PPM):
     with open(outfile, 'w') as filehandle:
         filehandle.write("Average velocity: {:.5f} m/s\n".format(vAvg))
         filehandle.write("Trendline slope: {:.5f} m/s^2\n".format(slope))
+        filehandle.write("Pixels/m: {}\n".format(PPM))
+        filehandle.write('N = {}\n'.format(len(times)))
         if delta != -1:
             filehandle.write("Delta: {:.5f}\n".format(delta))
         filehandle.write("\nTimes:\n")
         i = 0
         for i in range(len(times)):
             filehandle.write('{}: {}\n'.format(i+1, times[i]))
-        filehandle.write('N = {}\n'.format(len(times)))
         filehandle.write("\nVelocities:\n")
         i = 0
         for i in range(len(times)):
             filehandle.write('{}: {}\n'.format(i+1, velocities[i]))
-        filehandle.write('N = {}'.format(len(velocities)))
     filehandle.close()
 
 
-# --- Adjust these variables as needed for each video
-measuring_length = 2.35  # meters
-camera_fps = 30  # frames per second
-releaseFrame = 170  # this is the frame where the obj is released and the timer starts
-numPoints = 16  # number of times velocity will be calculated
-video_path = "ANMR0025.mp4"
-tracker_type = 'CSRT'
-video = cv2.VideoCapture(video_path)
-
+# ---- MAIN CODE ---- #
 if not video.isOpened():
     print("Video not opened")
     sys.exit()
@@ -112,7 +112,7 @@ else:
 calcDelta = int(input("Calculate delta? (1=yes,0=no)\n"))
 out = int(input("Write data to file? (1=yes,0=no)\n"))
 if out == 1:
-    outfile = input("Enter name of file to write to:")
+    outfile = input("Enter name of txt file to write to: ")
 
 frame = cv2.resize(frame, (854, 480))
 measuringBounds = cv2.selectROI(
@@ -228,9 +228,10 @@ fig.text(0, 1, 'm = {}'.format(slope))
 ax.plot(times, velocities, 'bo')
 ax.set_xlabel('time (s)')
 ax.set_ylabel('velocity (m/s)')
-ax.set_title(video_path)
+ax.set_title(video_path.split('\\')[-1])
 ax.plot(times, trendline(times), linestyle='dashed')
 if out == 1:
-    writeToFile(outfile, delta, times, velocities, vAvg, slope)
+    writeToFile(outfile, delta, times, velocities,
+                vAvg, slope, PIXELS_PER_METER)
     plt.savefig(outfile.split('.')[0]+'.png')
 plt.show()
