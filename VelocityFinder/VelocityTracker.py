@@ -85,7 +85,7 @@ measuring_length = 2.35  # meters
 camera_fps = 30  # frames per second
 releaseFrame = 170  # this is the frame where the obj is released and the timer starts
 numPoints = 16  # number of times velocity will be calculated
-video_path = "Wave Tank Vids\ANMR0013.mp4"
+video_path = "ANMR0025.mp4"
 tracker_type = 'CSRT'
 video = cv2.VideoCapture(video_path)
 
@@ -228,9 +228,9 @@ fig.text(0, 1, 'm = {}'.format(slope))
 ax.plot(times, velocities, 'bo')
 ax.set_xlabel('time (s)')
 ax.set_ylabel('velocity (m/s)')
-ax.set_title('Drifter velocity')
+ax.set_title(video_path)
 ax.plot(times, trendline(times), linestyle='dashed')
 if out == 1:
     writeToFile(outfile, delta, times, velocities, vAvg, slope)
-    plt.savefig('out3.png')
+    plt.savefig(outfile.split('.')[0]+'.png')
 plt.show()
