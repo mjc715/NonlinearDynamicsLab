@@ -4,6 +4,37 @@ import sys
 import numpy as np
 
 
+def promptUser(frame):
+    ppmCalculated = 0
+    calcDelta = 0
+    PIXELS_PER_METER = 0
+    outfile = " "
+    measuringBounds = []
+    horizontal = int(
+        input("Horizontal or vertical? (1= horizontal,0= vertical)\n"))
+    positionVSTime = int(
+        input("What graph? (1=pos x time,0= vel x time)\n"))
+    out = int(input("Write data to file? (1=yes,0=no)\n"))
+    if out == 1:
+        outfile = input("Enter name of txt file to write to: ")
+    if not positionVSTime:
+        ppmCalculated = int(
+            input("Do you have avg pixels/m already calculated? (1=yes,0=no)\n"))
+        if ppmCalculated == 1:
+            PIXELS_PER_METER = float(input("Input pixels/m: "))
+        elif horizontal:
+            PIXELS_PER_METER = getAveragePixelPerMeterHorizontal(
+                frame)   # HORIZONTAL
+        elif not horizontal:
+            PIXELS_PER_METER = getAveragePixelPerMeterVertical(frame)
+        calcDelta = int(input("Calculate delta? (1=yes,0=no)\n"))
+        frame = cv2.resize(frame, (854, 480))
+        measuringBounds = cv2.selectROI(
+            "Select tracking area", frame)  # Select plane that drifter moves thru
+        cv2.destroyAllWindows()
+    return horizontal, positionVSTime, out, outfile, calcDelta, measuringBounds, PIXELS_PER_METER
+
+
 def getAveragePixelPerMeterHorizontal(frame):
     frame = cv2.resize(frame, (854, 480))
     measuringBounds = cv2.selectROI(
@@ -60,7 +91,7 @@ def calculateDelta(vAvg):
     print(str.format(deltas[0]))
 
 
-def writeToFile(outfile, delta, times, velocities, vAvg, slope, PPM):
+def writeToFileVel(outfile, delta, times, velocities, vAvg, slope, PPM):
     with open(outfile, 'w') as filehandle:
         filehandle.write("Average velocity: {:.5f} m/s\n".format(vAvg))
         filehandle.write("Trendline slope: {:.5f} m/s^2\n".format(slope))
@@ -79,7 +110,22 @@ def writeToFile(outfile, delta, times, velocities, vAvg, slope, PPM):
     filehandle.close()
 
 
-def verticalTracking(measuring_length, releaseFrame, numPoints, video_path, tracker_type, video):
+def writeToFilePos(outfile, times, pos, slope):
+    with open(outfile, 'w') as filehandle:
+        filehandle.write("Trendline slope: {:.5f} m/s\n".format(slope))
+        filehandle.write('N = {}\n'.format(len(times)))
+        filehandle.write("\nTimes:\n")
+        i = 0
+        for i in range(len(times)):
+            filehandle.write('{}: {}\n'.format(i+1, times[i]))
+        filehandle.write("\nPositions\:\n")
+        i = 0
+        for i in range(len(times)):
+            filehandle.write('{}: {}\n'.format(i+1, pos[i]))
+    filehandle.close()
+
+
+def verticalTracking(releaseFrame, numPoints, video_path, tracker_type, video, positionVSTime, out, outfile, calcDelta, measuringBounds, PIXELS_PER_METER):
     if not video.isOpened():
         print("Video not opened")
         sys.exit()
@@ -92,26 +138,14 @@ def verticalTracking(measuring_length, releaseFrame, numPoints, video_path, trac
     if not rete:
         print('Cant read video file')
         sys.exit()
-    ppmCalculated = int(
-        input("Do you have avg pixels/m already calculated? (1=yes,0=no)\n"))
-    if ppmCalculated == 1:
-        PIXELS_PER_METER = float(input("Input pixels/m: "))
-    else:
-        PIXELS_PER_METER = getAveragePixelPerMeterVertical(frame)   # VERTICAL
-
-    calcDelta = int(input("Calculate delta? (1=yes,0=no)\n"))
-    out = int(input("Write data to file? (1=yes,0=no)\n"))
-    if out == 1:
-        outfile = input("Enter name of txt file to write to: ")
-
-    frame = cv2.resize(frame, (854, 480))
-    measuringBounds = cv2.selectROI(
-        "Select tracking area", frame)  # Select plane that drifter moves thru
-    cv2.destroyAllWindows()
-
-    pixel_length = measuringBounds[3]  # VERTICAL length
-    trackingPoints, interval = np.linspace(measuringBounds[1],
-                                           measuringBounds[1] + measuringBounds[3], numPoints, retstep=True)  # returns various heights to get velocity at (VERTICAL)
+    trackingPoints = []
+    if not positionVSTime:
+        frame = cv2.resize(frame, (854, 480))
+        measuringBounds = cv2.selectROI(
+            "Select tracking area", frame)  # Select plane that drifter moves thru
+        cv2.destroyAllWindows()
+        trackingPoints, interval = np.linspace(measuringBounds[1],
+                                               measuringBounds[1] + measuringBounds[3], numPoints, retstep=True)  # returns various heights to get velocity at (VERTICAL)
 
     params = cv2.SimpleBlobDetector_Params()
     params.filterByCircularity = True
@@ -124,11 +158,12 @@ def verticalTracking(measuring_length, releaseFrame, numPoints, video_path, trac
 
     objectBounds = cv2.selectROI("Select object", frame)
     cv2.destroyAllWindows()
+    initialPos = objectBounds[1]
     rete = tracker.init(frame, objectBounds)
     p1, prev = None, None
     frameCount, prevFrame, speed = releaseFrame, 0, 0
     trackingCount = numPoints  # VERTICAL
-    velocities, times = [], []
+    velocities, times, pos = [], [], []
 
     while video.isOpened():
         rete, frame = video.read()
@@ -152,13 +187,16 @@ def verticalTracking(measuring_length, releaseFrame, numPoints, video_path, trac
         else:
             cv2.putText(frame, "Tracking failure detected", (100, 80),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
-
-        if trackingCount >= 0 and objectBounds[1] <= trackingPoints[trackingCount]:
+        totalTime = (frameCount - releaseFrame) / camera_fps
+        currentPosition = objectBounds[1]
+        if positionVSTime and totalTime % 0.25 == 0:
+            times.append(totalTime)
+            pos.append(initialPos - currentPosition)
+        if not positionVSTime and trackingCount >= 0 and objectBounds[1] <= trackingPoints[trackingCount]:
             timeInterval = (frameCount - prevFrame) / camera_fps
             length = interval / PIXELS_PER_METER
             speed = length / timeInterval
             velocities.append(speed)
-            totalTime = (frameCount - releaseFrame) / camera_fps
             times.append(totalTime)
             prevFrame = frameCount
             trackingCount -= 1
@@ -180,40 +218,56 @@ def verticalTracking(measuring_length, releaseFrame, numPoints, video_path, trac
     # This removes the points in the first half second, they are unstable
     i = 0
     t = 0
-    while t <= .5 and i < numPoints-1:
-        t = times[i]
-        i += 1
-    times = times[i:]
-    velocities = velocities[i:]
+    if not positionVSTime:
+        while t <= .5 and i < numPoints-1:
+            t = times[i]
+            i += 1
+        times = times[i:]
+        velocities = velocities[i:]
 
     # Getting avg velocity and using it to calculate delta
-    delta = -1
-    vAvg = np.sum(velocities) / len(velocities)
-    str = "\nAverage velocity: {} m/s"
-    print(str.format(vAvg))
-    if calcDelta == 1:
-        delta = calculateDelta(vAvg)
+    if not positionVSTime:
+        delta = -1
+        vAvg = np.sum(velocities) / len(velocities)
+        str = "\nAverage velocity: {} m/s"
+        print(str.format(vAvg))
+        if calcDelta == 1:
+            delta = calculateDelta(vAvg)
 
     # Formatting plots
-    trendline = np.poly1d(np.polyfit(times, velocities, 1))
-    slope = (trendline(times[1]) - trendline(times[0])) / (times[1]-times[0])
-    print('trendline slope = {:.5f} m/s^2'.format(slope))
     fig, ax = plt.subplots()
-    fig.text(0, 1, 'm = {}'.format(slope))
-    ax.plot(times, velocities, 'bo')
-    ax.set_xlabel('time (s)')
-    ax.set_ylabel('velocity (m/s)')
+    if positionVSTime:
+        trendline = np.poly1d(np.polyfit(times, pos, 1))
+        slope = (trendline(times[1]) -
+                 trendline(times[0])) / (times[1]-times[0])
+        print('trendline slope = {:.5f} m/s'.format(slope))
+        ax.plot(times, pos, 'bo')
+        ax.set_xlabel('time (s)')
+        ax.set_ylabel('position (pixels)')
+    else:
+        trendline = np.poly1d(np.polyfit(times, velocities, 1))
+        slope = (trendline(times[1]) -
+                 trendline(times[0])) / (times[1]-times[0])
+        print('trendline slope = {:.5f} m/s^2'.format(slope))
+        fig.text(0, 1, 'm = {}'.format(slope))
+        ax.plot(times, velocities, 'bo')
+        ax.set_xlabel('time (s)')
+        ax.set_ylabel('velocity (m/s)')
     ax.set_title(video_path.split('\\')[-1])
     ax.plot(times, trendline(times), linestyle='dashed')
-    if out == 1:
-        writeToFile(outfile, delta, times, velocities,
-                    vAvg, slope, PIXELS_PER_METER)
+    fig.text(0, 1, 'm = {}'.format(slope))
+    if out and positionVSTime:
+        writeToFilePos(outfile, times, pos, slope)
+        plt.savefig(outfile.split('.')[0]+'.png')
+    elif out:
+        writeToFileVel(outfile, delta, times, velocities,
+                       vAvg, slope, PIXELS_PER_METER)
         plt.savefig(outfile.split('.')[0]+'.png')
     plt.show()
     return None
 
 
-def horizontalTracking(measuring_length, releaseFrame, numPoints, video_path, tracker_type, video):
+def horizontalTracking(releaseFrame, numPoints, video_path, tracker_type, video, positionVSTime, out, outfile, calcDelta, measuringBounds, PIXELS_PER_METER):
     if not video.isOpened():
         print("Video not opened")
         sys.exit()
@@ -226,27 +280,15 @@ def horizontalTracking(measuring_length, releaseFrame, numPoints, video_path, tr
     if not rete:
         print('Cant read video file')
         sys.exit()
-    ppmCalculated = int(
-        input("Do you have avg pixels/m already calculated? (1=yes,0=no)\n"))
-    if ppmCalculated == 1:
-        PIXELS_PER_METER = float(input("Input pixels/m: "))
-    else:
-        PIXELS_PER_METER = getAveragePixelPerMeterHorizontal(
-            frame)   # HORIZONTAL
 
-    calcDelta = int(input("Calculate delta? (1=yes,0=no)\n"))
-    out = int(input("Write data to file? (1=yes,0=no)\n"))
-    if out == 1:
-        outfile = input("Enter name of txt file to write to: ")
-
-    frame = cv2.resize(frame, (854, 480))
-    measuringBounds = cv2.selectROI(
-        "Select tracking area", frame)  # Select plane that drifter moves thru
-    cv2.destroyAllWindows()
-
-    pixel_length = measuringBounds[2]
-    trackingPoints, interval = np.linspace(measuringBounds[0],
-                                           measuringBounds[0] + measuringBounds[2], numPoints, retstep=True)  # returns various points to get velocity at
+    trackingPoints = []
+    if not positionVSTime:
+        frame = cv2.resize(frame, (854, 480))
+        measuringBounds = cv2.selectROI(
+            "Select tracking area", frame)  # Select plane that drifter moves thru
+        cv2.destroyAllWindows()
+        trackingPoints, interval = np.linspace(measuringBounds[0],
+                                               measuringBounds[0] + measuringBounds[2], numPoints, retstep=True)  # returns various points to get velocity at
 
     params = cv2.SimpleBlobDetector_Params()
     params.filterByCircularity = True
@@ -259,11 +301,12 @@ def horizontalTracking(measuring_length, releaseFrame, numPoints, video_path, tr
 
     objectBounds = cv2.selectROI("Select object", frame)
     cv2.destroyAllWindows()
+    initalPos = objectBounds[0] + objectBounds[2]
     rete = tracker.init(frame, objectBounds)
     p1, prev = None, None
     frameCount, prevFrame, speed = releaseFrame, 0, 0
     trackingCount = 0  # HORIZONTAL
-    velocities, times = [], []
+    velocities, times, pos = [], [], []
 
     while video.isOpened():
         rete, frame = video.read()
@@ -287,17 +330,20 @@ def horizontalTracking(measuring_length, releaseFrame, numPoints, video_path, tr
         else:
             cv2.putText(frame, "Tracking failure detected", (100, 80),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
+        totalTime = (frameCount - releaseFrame) / camera_fps
+        currentPosition = objectBounds[0] + objectBounds[2]
 
-        if trackingCount <= numPoints - 1 and objectBounds[0] >= trackingPoints[trackingCount]:
-            # if objectBounds[1] <= trackingPoints[trackingCount] and trackingCount >= 0: # VERTICAL
+        if positionVSTime and totalTime % 0.25 == 0:
+            times.append(totalTime)
+            pos.append(currentPosition - initalPos)
+        if not positionVSTime and trackingCount <= numPoints - 1 and objectBounds[0] >= trackingPoints[trackingCount]:
+            # This is to graph positions
             timeInterval = (frameCount - prevFrame) / camera_fps
             length = interval / PIXELS_PER_METER
             speed = length / timeInterval
             velocities.append(speed)
-            totalTime = (frameCount - releaseFrame) / camera_fps
             times.append(totalTime)
             prevFrame = frameCount
-            # - for VERTICAL, + for HORIZONTAL, also change trackingCount to start at 0
             trackingCount += 1
 
         cv2.putText(frame, "Velocity : {}".format(float(speed)), (100, 100),
@@ -317,34 +363,49 @@ def horizontalTracking(measuring_length, releaseFrame, numPoints, video_path, tr
     # This removes the points in the first half second
     i = 0
     t = 0
-    while t <= .5 and i < numPoints-1:
-        t = times[i]
-        i += 1
-    times = times[i:]
-    velocities = velocities[i:]
+    if not positionVSTime:
+        while t <= .5 and i < numPoints-1:
+            t = times[i]
+            i += 1
+        times = times[i:]
+        velocities = velocities[i:]
 
     # Getting avg velocity and using it to calculate delta
-    delta = -1
-    vAvg = np.sum(velocities) / len(velocities)
-    str = "\nAverage velocity: {} m/s"
-    print(str.format(vAvg))
-    if calcDelta == 1:
-        delta = calculateDelta(vAvg)
+    if not positionVSTime:
+        delta = -1
+        vAvg = np.sum(velocities) / len(velocities)
+        str = "\nAverage velocity: {} m/s"
+        print(str.format(vAvg))
+        if calcDelta == 1:
+            delta = calculateDelta(vAvg)
 
     # Formatting plots
-    trendline = np.poly1d(np.polyfit(times, velocities, 1))
-    slope = (trendline(times[1]) - trendline(times[0])) / (times[1]-times[0])
-    print('trendline slope = {:.5f} m/s^2'.format(slope))
     fig, ax = plt.subplots()
+    if positionVSTime:
+        trendline = np.poly1d(np.polyfit(times, pos, 1))
+        slope = (trendline(times[1]) -
+                 trendline(times[0])) / (times[1]-times[0])
+        print('trendline slope = {:.5f} pixels/s'.format(slope))
+        ax.plot(times, pos, 'bo')
+        ax.set_xlabel('time (s)')
+        ax.set_ylabel('position (pixels)')
+    else:
+        trendline = np.poly1d(np.polyfit(times, velocities, 1))
+        slope = (trendline(times[1]) -
+                 trendline(times[0])) / (times[1]-times[0])
+        print('trendline slope = {:.5f} m/s^2'.format(slope))
+        ax.plot(times, velocities, 'bo')
+        ax.set_xlabel('time (s)')
+        ax.set_ylabel('velocity (m/s)')
     fig.text(0, 1, 'm = {}'.format(slope))
-    ax.plot(times, velocities, 'bo')
-    ax.set_xlabel('time (s)')
-    ax.set_ylabel('velocity (m/s)')
     ax.set_title(video_path.split('\\')[-1])
     ax.plot(times, trendline(times), linestyle='dashed')
-    if out == 1:
-        writeToFile(outfile, delta, times, velocities,
-                    vAvg, slope, PIXELS_PER_METER)
+    if out and positionVSTime:
+        writeToFilePos(outfile, times, pos, slope)
+        plt.savefig(outfile.split('.')[0]+'.png')
+    elif out:
+        writeToFileVel(outfile, delta, times, velocities,
+                       vAvg, slope, PIXELS_PER_METER)
         plt.savefig(outfile.split('.')[0]+'.png')
     plt.show()
     return None
@@ -353,13 +414,17 @@ def horizontalTracking(measuring_length, releaseFrame, numPoints, video_path, tr
 # ---- MAIN CODE ---- #
 measuring_length = 2.35  # meters
 camera_fps = 30  # frames per second
-releaseFrame = 160  # this is the frame where the obj is released and the timer starts
+releaseFrame = 190  # this is the frame where the obj is released and the timer starts
 numPoints = 16  # number of times velocity will be calculated
-video_path = "Wave Tank Vids\ANMR0013.mp4"
+video_path = "Wave Tank Vids\ANMR0021.mp4"
 tracker_type = 'CSRT'
 video = cv2.VideoCapture(video_path)
-
-horizontalTracking(measuring_length, releaseFrame,
-                   numPoints, video_path, tracker_type, video)
-# verticalTracking(measuring_length, releaseFrame,
-#                    numPoints, video_path, tracker_type, video)  # Use if tracking vertical velocity
+rete, frame = video.read()
+horizontal, positionVSTime, out, outfile, calcDelta, measuringBounds, PIXELS_PER_METER = promptUser(
+    frame)
+if horizontal:
+    horizontalTracking(releaseFrame,
+                       numPoints, video_path, tracker_type, video, positionVSTime, out, outfile, calcDelta, measuringBounds, PIXELS_PER_METER)
+else:
+    verticalTracking(releaseFrame,
+                     numPoints, video_path, tracker_type, video, positionVSTime, out, outfile, calcDelta, measuringBounds, PIXELS_PER_METER)  # Use if tracking vertical velocity
