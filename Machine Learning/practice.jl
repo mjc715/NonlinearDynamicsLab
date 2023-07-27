@@ -1,14 +1,3 @@
-using Pkg
-Pkg.add("DiffEqParamEstim")
-Pkg.add("DifferentialEquations")
-Pkg.add("Plots")
-Pkg.add("RecursiveArrayTools")
-Pkg.add("Optimization")
-Pkg.add("OptimizationOptimJL")
-Pkg.add("ForwardDiff")
-Pkg.add("OptimizationBBO")
-Pkg.add("Optim")
-
 using DiffEqParamEstim, DifferentialEquations, Plots, Optimization, OptimizationOptimJL
 using RecursiveArrayTools, ForwardDiff, OptimizationBBO, Optim
 
@@ -28,7 +17,7 @@ sol = solve(prob, Tsit5())
 #--- Get times to test at
 t = collect(range(0, stop=10, length=200))
 #--- Getting noisy data points to reverse engineer params with
-randomized = VectorOfArray([(sol(t[i]) .+ 0.01randn(2)) for i in 1:length(t)])
+randomized = VectorOfArray([(sol(t[i]) .+ 0.01randn(1)) for i in 1:length(t)])
 data = convert(Array, randomized)
 
 # println(data)
