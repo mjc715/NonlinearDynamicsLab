@@ -16,7 +16,7 @@ ddprob = DataDrivenProblem(sol)
 
 @variables t x(t)
 u = [x]
-basis = Basis(polynomial_basis(u, 5), u, iv=t)  # Not working
+basis = Basis(polynomial_basis(u, 5), u, iv=t)
 opt = STLSQ(exp10.(-5:0.1:-1))
-ddsol = solve(ddprob, basis, opt, options=DataDrivenCommonOptions(digits=1))
+ddsol = solve(ddprob, basis, opt, options=DataDrivenCommonOptions(digits=1)) # Not working
 println(get_basis(ddsol))
