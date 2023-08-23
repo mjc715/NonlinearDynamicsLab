@@ -19,11 +19,13 @@ ts = sol.t
 
 prob = ContinuousDataDrivenProblem(X, ts, GaussianKernel(),) # What does this part specify?
 
-@variables u[1:1]
+@variables u[1:1] t[1:1]
+t = collect(t)
 u = collect(u)
 
-# h = Num[polynomial_basis(u, 5)]
-basis = Basis(polynomial_basis(u, 5), u)
+h = Num[polynomial_basis(u, 5); t]
+basis = Basis(h, u)
+# basis = Basis(h)
 
 sampler = DataProcessing(split=0.8, shuffle=true, batchsize=25, rng=rng)
 lambdas = exp10.(-10:0.1:0)
