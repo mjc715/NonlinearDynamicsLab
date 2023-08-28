@@ -4,11 +4,12 @@ using DataDrivenSparse, LinearAlgebra, StableRNGs, Plots
 rng = StableRNG(1000)
 
 function f(u, p, t)  # Make function depend on t as well
-    x = 2.0 * u[1] * t
-    return [x]
+    x = 2.0 * u[1] * u[2]
+    y = u[2]
+    return [x;y]
 end
 
-u0 = [1.0]
+u0 = [1.0; 0]
 tspan = (0.0, 3.0)
 dt = 0.1
 prob = ODEProblem(f, u0, tspan)
@@ -19,11 +20,10 @@ ts = sol.t
 
 prob = ContinuousDataDrivenProblem(X, ts, GaussianKernel(),) # What does this part specify?
 
-@variables u[1:1] t[1:1]
-t = collect(t)
+@variables u[1:2]
 u = collect(u)
 
-h = Num[polynomial_basis(u, 5); t]
+h = Num[polynomial_basis(u, 5); u]
 basis = Basis(h, u)
 # basis = Basis(h)
 
