@@ -4,9 +4,9 @@ using DataDrivenSparse, LinearAlgebra, StableRNGs, Plots
 rng = StableRNG(1000)
 
 function f(u, p, t)  # Make function depend on t as well
-    x = 2.0 * u[1] * u[2]
-    y = u[2]
-    return [x;y]
+    y = 1
+    x = 2.0 * u[1] * y
+    return [x; y]
 end
 
 u0 = [1.0; 0]
