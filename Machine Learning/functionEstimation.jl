@@ -4,13 +4,14 @@ using DataDrivenSparse, LinearAlgebra, StableRNGs, Plots
 rng = StableRNG(1000)
 
 function f(u, p, t)  # Make function depend on t as well
-    x = 2.0 * u[1] * u[2]
-    y = u[2]
-    return [x;y]
+    x,y = u   
+    dx = 2.0 * x * y
+    dy = 1
+    return [dx;dy]
 end
 
 u0 = [1.0; 0]
-tspan = (0.0, 3.0)
+tspan = (0.0, 1.0)
 dt = 0.1
 prob = ODEProblem(f, u0, tspan)
 sol = solve(prob, Tsit5(), saveat=dt)
