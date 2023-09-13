@@ -4,9 +4,10 @@ using DataDrivenSparse, LinearAlgebra, StableRNGs, Plots
 rng = StableRNG(1000)
 
 function f(u, p, t)
-    y = 1 #--- This only uses 1 variable, so u[2] isnt being used, but how else do I set y = 1 always?
-    x = 2.0 * u[1] * y
-    return [x; y]
+    x, y = u
+    dx = 2.0 * x * y
+    dy = 1
+    return [dx, dy]
 end
 
 u0 = [1.0; 0]
