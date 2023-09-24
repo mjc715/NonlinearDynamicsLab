@@ -36,7 +36,7 @@ basis = Basis(h, u)
 
 sampler = DataProcessing(split=0.8, shuffle=true, batchsize=25, rng=rng)
 lambdas = exp10.(-10:0.1:0)
-opt = STLSQ(lambdas)
+opt = STLSQ(lambdas, 1.0)
 res = solve(prob, basis, opt, options=DataDrivenCommonOptions(data_processing=sampler, digits=2))
 
 system = get_basis(res)
