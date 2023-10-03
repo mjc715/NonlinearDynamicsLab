@@ -144,7 +144,7 @@ def verticalTracking(
     params.blobColor = 150
     params.minCircularity = 0.8
 
-    tracker = cv2.TrackerCSRT_create()
+    tracker = cv2.TrackerKCF_create()
     frame = cv2.resize(frame, (854, 480))
 
     objectBounds = cv2.selectROI("Select object", frame)

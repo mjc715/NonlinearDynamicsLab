@@ -4,7 +4,7 @@ using DataDrivenSparse, LinearAlgebra, StableRNGs, Plots
 rng = StableRNG(1000)
 
 # Ctrl-Shift-P -> Start REPL -> pwd() -> cd("Machine Learning") -> include("____")
-# Work on preventing overfitting
+# Define own variable using ModelingToolkit and have it be equal to a function. Use this in basis
 
 function f(u, p, t)
     x, y = u
@@ -24,6 +24,7 @@ ts = sol.t
 
 prob = ContinuousDataDrivenProblem(X, ts, GaussianKernel(),) # What does this part specify?
 
+@variables F = f(u, p, t)
 @variables u[1:2]
 u = collect(u)
 
@@ -32,7 +33,7 @@ basis = Basis(h, u)
 
 sampler = DataProcessing(split=0.8, shuffle=true, batchsize=25, rng=rng)
 lambdas = exp10.(-10:0.1:0)
-opt = STLSQ(lambdas) # How does the optimization work?
+opt = STLSQ(lambdas, 1.0) # How does the optimization work?
 res = solve(prob, basis, opt, options=DataDrivenCommonOptions(data_processing=sampler, digits=2))
 system = get_basis(res)
 params = get_parameter_map(system)
