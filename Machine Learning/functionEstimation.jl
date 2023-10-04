@@ -27,18 +27,21 @@ X = sol[:, :] + 0.2 .* randn(rng, size(sol))
 ts = sol.t
 
 prob = ContinuousDataDrivenProblem(X, ts, GaussianKernel(),)
-
-@variables F = f(u, p, t)
-@variables u[1:2]
+@variables u[1:2] x y t
+@parameters p
 u = collect(u)
 
-h = Num[polynomial_basis(u, 2); u]
-basis = Basis(h, u)
+basis1 = x * y
+basis2 = 1
+basis3 = [basis1, basis2]
+# h = Num[u; F]
+# basis = Basis(h, F)
+# basis = Basis([u, F(t)], u)
 
 sampler = DataProcessing(split=0.8, shuffle=true, batchsize=25, rng=rng)
 lambdas = exp10.(-10:0.1:0)
 opt = STLSQ(lambdas, 1.0)
-res = solve(prob, basis, opt, options=DataDrivenCommonOptions(data_processing=sampler, digits=2))
+res = solve(prob, basis3, opt, options=DataDrivenCommonOptions(data_processing=sampler, digits=2))
 
 system = get_basis(res)
 params = get_parameter_map(system)
