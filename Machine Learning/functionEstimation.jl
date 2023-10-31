@@ -1,4 +1,4 @@
-using DataDrivenDiffEq, ModelingToolkit, OrdinaryDiffEq
+using DataDrivenDiffEq, ModelingToolkit, OrdinaryDiffEq, Interpolations
 using DataDrivenSparse, LinearAlgebra, StableRNGs, Plots
 
 rng = StableRNG(1000)
@@ -7,19 +7,23 @@ rng = StableRNG(1000)
 # Look into ridge regression, complicate f_data, explain how code works
 
 # f_data represents potential interpolating function
-function f_data(x, y)
-    return x + y
+xs = 0:0.2:20000
+A = xs .* 2
+interp_linear = linear_interpolation(xs, A)
+
+function f_data(x)
+    return interp_linear(x)
 end
 
 # Included time dependence by making dy = 1
 function f(u, p, t)
     x, y = u
-    dx = 2.0 * x * y + f_data(x, y)
+    dx = 2.0 * x * y + f_data(x)
     dy = 1
     return [dx, dy]
 end
 
-@register_symbolic f_data(x, y)
+@register_symbolic f_data(x)
 
 # Setting initial conditions
 u0 = [1.0; 0]
@@ -38,7 +42,7 @@ prob = ContinuousDataDrivenProblem(X, ts, GaussianKernel(),)
 
 @variables u[1:2] t
 u = collect(u)
-h = Num[polynomial_basis(u, 2); f_data(u[1:2]...)]
+h = Num[polynomial_basis(u, 2); f_data(u[1]...)]
 basis = Basis(h, u)
 
 
